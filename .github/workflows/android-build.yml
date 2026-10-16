@@ -59,7 +59,22 @@ jobs:
               cp "$f" "dist/UltraSniffer-${abi}-${type}-${VERSION}.apk"
             done
           done
+
+          # Stable names for the release page: हर build पर वही file name, इसलिए
+          # पुरानी APK अपने-आप replace हो जाती है और download link कभी नहीं टूटता।
+          for abi in arm64-v8a armeabi-v7a universal; do
+            src=$(ls dist/UltraSniffer-${abi}-release-${VERSION}.apk 2>/dev/null || true)
+            [ -n "$src" ] && cp "$src" "dist/UltraSniffer-${abi}.apk"
+          done
           ls -lh dist
+
+      - name: Remove stale APK assets from the "latest" release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view latest --json assets --jq '.assets[].name' 2>/dev/null \
+            | grep '\.apk$' \
+            | while read -r name; do gh release delete-asset latest "$name" -y || true; done
 
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
@@ -67,7 +82,7 @@ jobs:
           name: UltraSniffer-APK-${{ github.run_number }}
           # Keep the artifact small (free accounts have a 500 MB
           # artifact-storage quota). Full set is on the "latest" release.
-          path: dist/*arm64-v8a*.apk
+          path: dist/UltraSniffer-arm64-v8a-debug-*.apk
           retention-days: 7
 
       - name: Publish/update "latest" GitHub release (easy APK download)
@@ -76,13 +91,23 @@ jobs:
           tag_name: latest
           name: "Ultra Floating Video Sniffer — Latest Build"
           body: |
-            Automatic build from commit `${{ github.sha }}`.
+            Automatic build from commit `${{ github.sha }}` (run #${{ github.run_number }}).
 
-            **Install:** फ़ोन में नीचे वाली APK download करके install करें
-            (Settings में "Install unknown apps" allow करना पड़ेगा)।
+            ## 📲 फ़ोन में install करने का तरीका
+            1. नीचे Assets में से **`UltraSniffer-arm64-v8a.apk` (≈29 MB)** download करें —
+               2017 के बाद के लगभग सारे Android फ़ोन इसी के हैं।
+               * अगर "App not installed" आए → `UltraSniffer-armeabi-v7a.apk` (पुराना 32-bit फ़ोन)
+               * अगर पता न हो → `UltraSniffer-universal.apk` (≈109 MB, दोनों ABI)
+            2. File खोलें → "Install unknown apps" allow करें → Install।
+            3. App में **Start Sniffer & VPN** दबाएँ और Android के VPN +
+               "Display over other apps" permissions दे दें।
+            4. अब किसी भी app/browser में video चलाएँ → floating
+               **"Download This Video"** बटन tap करें → FFmpeg merge होकर
+               gallery (Movies/UltraSniffer) में save हो जाएगा।
 
-            - `UltraSniffer-arm64-v8a-release-*.apk` — ज़्यादातर नए फ़ोनों के लिए **(recommended)**
-            - `UltraSniffer-universal-release-*.apk` — अगर ऊपर वाली install न हो, तो यह लें
-            - `*-debug-*.apk` — same app का debug variant (backup के लिए)
-          files: dist/*.apk
+            पूरा guide + architecture: repo के `README.md` में।
+          files: |
+            dist/UltraSniffer-arm64-v8a.apk
+            dist/UltraSniffer-armeabi-v7a.apk
+            dist/UltraSniffer-universal.apk
           make_latest: true
