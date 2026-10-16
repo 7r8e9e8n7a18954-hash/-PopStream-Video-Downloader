@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ultra Floating Video Sniffer</string>
+
+    <string name="start_sniffer">Start Sniffer &amp; VPN</string>
+    <string name="stop_sniffer">Stop Sniffer &amp; VPN</string>
+    <string name="status_running">Sniffer चालू है — traffic monitor हो रहा है</string>
+    <string name="status_stopped">Sniffer बंद है — Start दबाएँ</string>
+    <string name="overlay_granted">Overlay: ✔</string>
+    <string name="overlay_missing">Overlay: ✖ अनुमति दें</string>
+    <string name="detected_count">%1$d media मिले</string>
+    <string name="overlay_ask">Floating button के लिए \'Display over other apps\' permission दें</string>
+    <string name="sniffer_starting">Sniffer + VPN शुरू हो रहा है…</string>
+    <string name="vpn_denied">VPN permission नहीं मिली — दोबारा try करें</string>
+
+    <string name="download_this_video">Download This Video</string>
+    <string name="download_started">Download शुरू — notification में progress देखें</string>
+    <string name="download">Download</string>
+    <string name="add_to_list">सिर्फ list में जोड़ें</string>
+    <string name="copy_url">URL copy करें</string>
+    <string name="copied">Clipboard में copy हो गया</string>
+    <string name="open_browser">Browser में खोलें</string>
+    <string name="details">Details</string>
+    <string name="shared_link_title">इस link को download करें?</string>
+
+    <string name="paste_exact_url">Exact URL paste करके download</string>
+    <string name="paste_url">URL paste करें</string>
+    <string name="paste_url_title">Video URL paste करें</string>
+    <string name="url_hint">https://example.com/video.m3u8</string>
+    <string name="invalid_url">सही http(s) URL डालें</string>
+
+    <string name="quic_block_label">QUIC block करें (ज्यादा traffic sniff होगा)</string>
+    <string name="sni_label">HTTPS host hints दिखाएँ (YouTube, FB, IG…)</string>
+    <string name="detected_media">Detected Media</string>
+    <string name="clear_list">साफ़ करें</string>
+    <string name="empty_media">अभी कुछ detect नहीं हुआ — कोई video चलाएँ या URL paste करें</string>
+
+    <!-- In-app browser (HTTPS capture) -->
+    <string name="browser_title">In-app Browser</string>
+    <string name="open_browser_hint">🌐 In-app Browser खोलें (HTTPS video भी पकड़े)</string>
+    <string name="browser_hint">Website address</string>
+    <string name="browser_go">Go</string>
+    <string name="browser_detected">🎯 Video मिला — download करने के लिए tap करें</string>
+    <string name="browser_detected_count">🎯 %1$d video मिले — download करने के लिए tap करें</string>
+    <string name="browser_detected_title">कौन-सा video download करें?</string>
+    <string name="open_in_app_browser">In-app browser में खोलें</string>
+    <string name="disclaimer">नोट: HTTPS (YouTube/FB/Instagram आदि) का content encrypted होता है — इनसे पूरा direct URL पकड़ने के लिए link को इस app में Share करें या paste करें। Plain HTTP (और सभी .m3u8/.mpd/.ts) URLs अपने-आप detect होते हैं। केवल अपनी अनुमति वाला content ही download करें।</string>
+</resources>

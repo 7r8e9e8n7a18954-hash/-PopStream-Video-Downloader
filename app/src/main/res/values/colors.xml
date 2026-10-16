@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand_primary">#7C4DFF</color>
+    <color name="brand_primary_dark">#5E35B1</color>
+    <color name="brand_secondary">#FF4081</color>
+    <color name="white">#FFFFFF</color>
+
+    <color name="status_ok">#2E7D32</color>
+    <color name="status_error">#C62828</color>
+    <color name="status_info">#1565C0</color>
+
+    <color name="chip_bg">#EDE7F6</color>
+    <color name="chip_text">#5E35B1</color>
+    <color name="logo_circle">#EDE7F6</color>
+
+    <color name="bubble_start">#7C4DFF</color>
+    <color name="bubble_end">#FF4081</color>
+
+    <color name="ic_launcher_background">#7C4DFF</color>
+</resources>
