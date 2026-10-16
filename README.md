@@ -111,10 +111,11 @@ non-root VPN app उसके अंदर का पूरा URL नहीं 
 3. Build पूरा होने पर:
    * **Releases → `latest`** में APK files मिलेंगी (सबसे आसान download link), और
    * **Actions → run → Artifacts** में `UltraSniffer-APK-*` zip भी मिलेगी।
-4. `UltraSniffer-arm64-v8a-release-*.apk` (**≈29 MB**) download करें (ज़्यादातर फ़ोनों के लिए
-   recommended)। अगर install न हो तो `UltraSniffer-universal-release-*.apk` (≈109 MB)
-   लें; पुराने 32-bit फ़ोन के लिए `UltraSniffer-armeabi-v7a-release-*.apk` (≈30 MB) है।
-   Debug variants भी वही मिलेंगे (backup के लिए)।
+4. **`UltraSniffer-arm64-v8a.apk`** (**≈29 MB**) download करें (ज़्यादातर फ़ोनों के लिए
+   recommended)। अगर install न हो तो `UltraSniffer-universal.apk` (≈109 MB)
+   लें; पुराने 32-bit फ़ोन के लिए `UltraSniffer-armeabi-v7a.apk` (≈30 MB) है।
+   ये names हर build में same रहते हैं — link हमेशा latest APK देगा।
+   Debug variant (backup के लिए) Actions → Artifacts में मिलता है।
 
 ### तरीका B — Android Studio
 
