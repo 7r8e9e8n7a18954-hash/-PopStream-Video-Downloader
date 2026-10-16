@@ -48,23 +48,17 @@ jobs:
         run: |
           set -e
           mkdir -p dist
-          VERSION="1.0.0-${{ github.run_number }}"
-          # ABI splits are enabled, so output names look like:
-          #   app-arm64-v8a-release.apk / app-universal-debug.apk
-          for type in debug release; do
-            for f in app/build/outputs/apk/$type/*.apk; do
-              base=$(basename "$f" .apk)                 # e.g. app-arm64-v8a-release
-              abi=$(echo "$base" | sed -E "s/^app-(.*)-${type}$/\1/")
-              if [ "$abi" = "$base" ]; then abi="universal"; fi
-              cp "$f" "dist/UltraSniffer-${abi}-${type}-${VERSION}.apk"
-            done
-          done
-
-          # Stable names for the release page: हर build पर वही file name, इसलिए
-          # पुरानी APK अपने-आप replace हो जाती है और download link कभी नहीं टूटता।
-          for abi in arm64-v8a armeabi-v7a universal; do
-            src=$(ls dist/UltraSniffer-${abi}-release-${VERSION}.apk 2>/dev/null || true)
-            [ -n "$src" ] && cp "$src" "dist/UltraSniffer-${abi}.apk"
+          VERSION="1.1.0-${{ github.run_number }}"
+          # ---- Release page: exactly ONE file --------------------------------
+          # The universal APK contains every supported ABI, so it installs on
+          # any phone. One file = zero confusion about which APK to download.
+          cp app/build/outputs/apk/release/app-universal-release.apk dist/UltraSniffer.apk
+          # ---- CI artifacts: per-ABI builds (smaller downloads) --------------
+          for f in app/build/outputs/apk/release/*.apk; do
+            base=$(basename "$f" .apk)                 # e.g. app-arm64-v8a-release
+            abi=$(echo "$base" | sed -E "s/^app-(.*)-release$/\1/")
+            if [ "$abi" = "$base" ]; then abi="universal"; fi
+            cp "$f" "dist/UltraSniffer-${abi}-release-${VERSION}.apk"
           done
           ls -lh dist
 
@@ -80,9 +74,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: UltraSniffer-APK-${{ github.run_number }}
-          # Keep the artifact small (free accounts have a 500 MB
-          # artifact-storage quota). Full set is on the "latest" release.
-          path: dist/UltraSniffer-arm64-v8a-debug-*.apk
+          # Small per-ABI release APKs for power users; the single universal
+          # APK is published on the "latest" release page.
+          path: |
+            dist/UltraSniffer-arm64-v8a-release-*.apk
+            dist/UltraSniffer-armeabi-v7a-release-*.apk
           retention-days: 7
 
       - name: Publish/update "latest" GitHub release (easy APK download)
@@ -93,21 +89,28 @@ jobs:
           body: |
             Automatic build from commit `${{ github.sha }}` (run #${{ github.run_number }}).
 
-            ## 📲 फ़ोन में install करने का तरीका
-            1. नीचे Assets में से **`UltraSniffer-arm64-v8a.apk` (≈29 MB)** download करें —
-               2017 के बाद के लगभग सारे Android फ़ोन इसी के हैं।
-               * अगर "App not installed" आए → `UltraSniffer-armeabi-v7a.apk` (पुराना 32-bit फ़ोन)
-               * अगर पता न हो → `UltraSniffer-universal.apk` (≈109 MB, दोनों ABI)
-            2. File खोलें → "Install unknown apps" allow करें → Install।
-            3. App में **Start Sniffer & VPN** दबाएँ और Android के VPN +
-               "Display over other apps" permissions दे दें।
-            4. अब किसी भी app/browser में video चलाएँ → floating
-               **"Download This Video"** बटन tap करें → FFmpeg merge होकर
-               gallery (Movies/UltraSniffer) में save हो जाएगा।
+            ## 📲 install करने का तरीका
+            नीचे Assets में सिर्फ़ **एक file** है:
+            **`UltraSniffer.apk`** — इसे download करें, खोलें, Install करें।
+            (इसमें सभी फ़ोन की libraries हैं — कोई confusion नहीं।)
 
-            पूरा guide + architecture: repo के `README.md` में।
+            ## ✨ इस build में नया क्या है
+            * **YouTube link paste करें → असली quality options में download**
+              (1080p तक, video+audio merge होकर एक MP4)।
+            * **किसी भी website का link paste करें** → app page के अंदर से
+              video (.mp4/.m3u8/.mpd) खुद ढूँढ लेता है।
+            * In-app browser में नया बटन **"🎬 इस page की video ढूँढो"**।
+            * कुछ भी block/बंद नहीं — कोई password, कोई admin panel, कोई kill-switch।
+
+            ## ▶️ 3 step में चलाएँ
+            1. App खोलें → **Start Sniffer & VPN** → Android की VPN +
+               "Display over other apps" permission allow करें।
+            2. किसी भी app/browser में video चलाएँ → floating
+               **"Download This Video"** बटन tap करें।
+            3. YouTube जैसी encrypted sites के लिए: link को app में
+               **Share** करें या app के paste box में डालें → quality चुनें।
+
+            पूरा guide: repo की `README.md`।
           files: |
-            dist/UltraSniffer-arm64-v8a.apk
-            dist/UltraSniffer-armeabi-v7a.apk
-            dist/UltraSniffer-universal.apk
+            dist/UltraSniffer.apk
           make_latest: true

@@ -20,12 +20,13 @@ object Prefs {
     }
 
     /**
-     * Block outbound QUIC (UDP/443). Many video apps use QUIC, which is
+     * Block outbound QUIC (UDP/443). Most video apps prefer QUIC, which is
      * encrypted end-to-end and therefore invisible to the sniffer. Blocking it
      * forces them back to TCP/TLS where at least host hints are visible.
+     * Default ON: maximum capture out of the box.
      */
     var blockQuic: Boolean
-        get() = prefs.getBoolean(KEY_BLOCK_QUIC, false)
+        get() = prefs.getBoolean(KEY_BLOCK_QUIC, true)
         set(value) = prefs.edit().putBoolean(KEY_BLOCK_QUIC, value).apply()
 
     /** Log HTTPS host hints detected via TLS SNI (host only, no full URL). */

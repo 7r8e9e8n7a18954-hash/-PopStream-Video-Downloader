@@ -36,7 +36,14 @@ object SnifferRepository {
     fun add(media: SniffedMedia): Boolean {
         val current = _media.value
         if (current.any { it.url == media.url }) return false
-        val updated = (listOf(media) + current).take(MAX_ITEMS)
+        // Same host + same file name + same kind = the same video found twice
+        // (packet sniffer + browser). Keep one entry (the newer URL/signature)
+        // instead of showing the user confusing duplicates.
+        val twin = current.firstOrNull {
+            it.host == media.host && it.label == media.label && it.kind == media.kind
+        }
+        val rest = if (twin != null) current.filterNot { it.url == twin.url } else current
+        val updated = (listOf(media) + rest).take(MAX_ITEMS)
         _media.value = updated
         _events.tryEmit(SnifferEvent.Detected(media))
         return true

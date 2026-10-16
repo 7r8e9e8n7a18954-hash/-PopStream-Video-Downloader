@@ -14,6 +14,9 @@
     <string name="vpn_denied">VPN permission नहीं मिली — दोबारा try करें</string>
 
     <string name="download_this_video">Download This Video</string>
+    <string name="bubble_open_browser">🌐 इस site की video ढूँढो</string>
+    <string name="bubble_open_failed">Browser नहीं खुल पाया</string>
+    <string name="browser_guide_toast">Video चलाएँ → फिर 🎬 \"इस page की video ढूँढो\" दबाएँ</string>
     <string name="download_started">Download शुरू — notification में progress देखें</string>
     <string name="download">Download</string>
     <string name="add_to_list">सिर्फ list में जोड़ें</string>
@@ -23,11 +26,22 @@
     <string name="details">Details</string>
     <string name="shared_link_title">इस link को download करें?</string>
 
-    <string name="paste_exact_url">Exact URL paste करके download</string>
+    <string name="paste_exact_url">🔗 कोई भी link paste करें (YouTube, site, video)</string>
     <string name="paste_url">URL paste करें</string>
-    <string name="paste_url_title">Video URL paste करें</string>
-    <string name="url_hint">https://example.com/video.m3u8</string>
+    <string name="paste_url_title">कोई भी video link paste करें</string>
+    <string name="url_hint">https://youtube.com/watch?v=…  या  https://site.com/video.m3u8</string>
     <string name="invalid_url">सही http(s) URL डालें</string>
+
+    <!-- Resolver (any link -> real video options) -->
+    <string name="resolving_title">Video ढूँढी जा रही है…</string>
+    <string name="resolve_failed">Video link नहीं मिला</string>
+    <string name="choose_stream_title">कौन-सी quality download करें?</string>
+    <string name="add_all_to_list">सब list में जोड़ें</string>
+    <string name="added_to_list">List में जोड़ दिया गया</string>
+    <string name="download_anyway">फिर भी download करो</string>
+    <string name="find_quality_options">🎬 Quality / असली link निकालो</string>
+    <string name="find_video_on_host">🎬 इस site पर video ढूँढो</string>
+    <string name="find_video_on_page">🎬 इस page की video ढूँढो</string>
 
     <string name="quic_block_label">QUIC block करें (ज्यादा traffic sniff होगा)</string>
     <string name="sni_label">HTTPS host hints दिखाएँ (YouTube, FB, IG…)</string>
@@ -44,5 +58,5 @@
     <string name="browser_detected_count">🎯 %1$d video मिले — download करने के लिए tap करें</string>
     <string name="browser_detected_title">कौन-सा video download करें?</string>
     <string name="open_in_app_browser">In-app browser में खोलें</string>
-    <string name="disclaimer">नोट: HTTPS (YouTube/FB/Instagram आदि) का content encrypted होता है — इनसे पूरा direct URL पकड़ने के लिए link को इस app में Share करें या paste करें। Plain HTTP (और सभी .m3u8/.mpd/.ts) URLs अपने-आप detect होते हैं। केवल अपनी अनुमति वाला content ही download करें।</string>
+    <string name="disclaimer">टिप: कोई भी link (YouTube/site) paste करें या in-app browser में video चलाएँ — app खुद असली stream link निकालकर सबसे अच्छी quality में download करेगा।</string>
 </resources>

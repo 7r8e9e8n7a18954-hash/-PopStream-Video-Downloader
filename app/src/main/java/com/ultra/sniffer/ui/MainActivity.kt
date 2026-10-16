@@ -213,7 +213,7 @@ class MainActivity : AppCompatActivity() {
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.shared_link_title)
             .setMessage(url)
-            .setPositiveButton(R.string.download) { _, _ -> enqueueDownload(url) }
+            .setPositiveButton(R.string.download) { _, _ -> ResolverFlow.resolveAndOffer(this, url) }
             .setNegativeButton(R.string.add_to_list) { _, _ ->
                 SnifferRepository.add(SniffedMedia.fromUrl(url, MediaSource.SHARE))
             }
@@ -243,7 +243,11 @@ class MainActivity : AppCompatActivity() {
             .setView(edit)
             .setPositiveButton(R.string.download) { _, _ ->
                 val url = edit.text.toString().trim()
-                if (url.startsWith("http")) enqueueDownload(url) else toast(getString(R.string.invalid_url))
+                if (url.startsWith("http") || url.contains('.')) {
+                    ResolverFlow.resolveAndOffer(this, url)
+                } else {
+                    toast(getString(R.string.invalid_url))
+                }
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
@@ -260,18 +264,24 @@ class MainActivity : AppCompatActivity() {
         val actions = mutableListOf<Pair<String, () -> Unit>>()
         if (media.downloadable) {
             actions.add(getString(R.string.download) to { enqueueDownload(media.url, media) })
-        } else {
-            actions.add(getString(R.string.paste_exact_url) to { showManualUrlDialog() })
-            actions.add(getString(R.string.open_in_app_browser) to {
-                runCatching { startActivity(BrowserActivity.intent(this, "https://${media.host}")) }
+            actions.add(getString(R.string.find_quality_options) to {
+                ResolverFlow.resolveAndOffer(this, media.url)
             })
-        }
-        actions.add(getString(R.string.copy_url) to { copyToClipboard(media.url) })
-        if (media.downloadable) {
             actions.add(getString(R.string.open_browser) to {
                 runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(media.url))) }
             })
+        } else {
+            // Encrypted traffic: we only know the host, so let the resolver
+            // find the actual video on it (homepage scan / embedded player).
+            actions.add(getString(R.string.find_video_on_host) to {
+                ResolverFlow.resolveAndOffer(this, "https://${media.host}")
+            })
+            actions.add(getString(R.string.open_in_app_browser) to {
+                runCatching { startActivity(BrowserActivity.intent(this, "https://${media.host}")) }
+            })
+            actions.add(getString(R.string.paste_exact_url) to { showManualUrlDialog() })
         }
+        actions.add(getString(R.string.copy_url) to { copyToClipboard(media.url) })
         actions.add(getString(R.string.details) to { showDetails(media) })
 
         MaterialAlertDialogBuilder(this)
@@ -287,7 +297,6 @@ class MainActivity : AppCompatActivity() {
             Host: ${media.host}
             Type: ${media.kind.label}
             Source: ${media.source.label}
-            Downloadable: ${if (media.downloadable) "हाँ" else "नहीं (encrypted traffic — केवल host hint)"}
         """.trimIndent()
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.details)

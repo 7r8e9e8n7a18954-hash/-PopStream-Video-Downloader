@@ -77,6 +77,38 @@ object MediaUrlUtils {
         }
     }
 
+    /** Video platforms whose *host hint* is worth a floating "open browser" bubble. */
+    private val VIDEO_PLATFORM_HOSTS = listOf(
+        "youtube", "googlevideo", "ytimg", "youtu.be",
+        "facebook", "fbcdn", "instagram", "cdninstagram",
+        "tiktok", "byteoversea", "twitter", "twimg", "x.com",
+        "vimeo", "dailymotion", "dmcdn", "twitch", "ttvnw",
+        "hotstar", "jio", "sonyliv", "zee5", "primevideo",
+        "aajtak", "ndtv", "news18", "abplive", "zeenews",
+        "sharechat", "moj", "mxplayer", "altbalaji", "voot"
+    )
+
+    fun isVideoPlatformHost(host: String): Boolean {
+        val h = host.lowercase()
+        return VIDEO_PLATFORM_HOSTS.any { h.contains(it) }
+    }
+
+    /** Best landing page for a host hint (googlevideo/ytimg → mobile YouTube). */
+    fun landingPageFor(host: String): String {
+        val h = host.lowercase()
+        return when {
+            h.contains("youtube") || h.contains("googlevideo") || h.contains("ytimg") ||
+                h.contains("youtu.be") -> "https://m.youtube.com/"
+            h.contains("facebook") || h.contains("fbcdn") -> "https://m.facebook.com/"
+            h.contains("instagram") || h.contains("cdninstagram") -> "https://www.instagram.com/"
+            h.contains("tiktok") || h.contains("byteoversea") -> "https://www.tiktok.com/"
+            h.contains("twitter") || h.contains("twimg") || h.contains("x.com") -> "https://x.com/"
+            h.contains("vimeo") -> "https://vimeo.com/"
+            h.contains("dailymotion") || h.contains("dmcdn") -> "https://www.dailymotion.com/"
+            else -> "https://$host"
+        }
+    }
+
     fun hostOf(url: String): String {
         runCatching { URI(url).host }.getOrNull()?.let { if (it.isNotBlank()) return it }
         val schemeIdx = url.indexOf("://")

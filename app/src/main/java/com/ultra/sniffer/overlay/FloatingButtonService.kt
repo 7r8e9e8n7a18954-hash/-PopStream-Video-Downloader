@@ -24,6 +24,7 @@ import com.ultra.sniffer.core.SniffedMedia
 import com.ultra.sniffer.core.SnifferEvent
 import com.ultra.sniffer.core.SnifferRepository
 import com.ultra.sniffer.download.DownloadService
+import com.ultra.sniffer.util.MediaUrlUtils
 import com.ultra.sniffer.util.Notifications
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -83,8 +84,11 @@ class FloatingButtonService : Service() {
         windowManager = getSystemService(WindowManager::class.java)
         observerJob = scope.launch {
             SnifferRepository.events.collect { event ->
-                if (event is SnifferEvent.Detected && event.media.downloadable) {
-                    showBubble(event.media)
+                if (event is SnifferEvent.Detected) {
+                    val media = event.media
+                    val worthHint = !media.downloadable &&
+                        MediaUrlUtils.isVideoPlatformHost(media.host)
+                    if (media.downloadable || worthHint) showBubble(media)
                 }
             }
         }
@@ -130,8 +134,12 @@ class FloatingButtonService : Service() {
         current = media
         if (bubble == null) createBubble()
         bubble?.let { view ->
-            view.findViewById<TextView>(R.id.bubbleTitle)?.text = getString(R.string.download_this_video)
-            view.findViewById<TextView>(R.id.bubbleSubtitle)?.text = "${media.host} • ${media.kind.label}"
+            val hint = !media.downloadable
+            view.findViewById<TextView>(R.id.bubbleTitle)?.text = getString(
+                if (hint) R.string.bubble_open_browser else R.string.download_this_video
+            )
+            view.findViewById<TextView>(R.id.bubbleSubtitle)?.text =
+                if (hint) "${media.host} • video भीतर browser में" else "${media.host} • ${media.kind.label}"
             view.alpha = 0f
             view.scaleX = 0.7f
             view.scaleY = 0.7f
@@ -200,6 +208,20 @@ class FloatingButtonService : Service() {
 
     private fun startDownload() {
         val media = current ?: return
+        if (!media.downloadable) {
+            // TLS host hint (YouTube/FB/IG…): open the site inside our browser,
+            // where the actual video link becomes visible.
+            val intent = Intent(this, com.ultra.sniffer.ui.BrowserActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .putExtra("extra_url", MediaUrlUtils.landingPageFor(media.host))
+            runCatching { startActivity(intent) }
+                .onFailure {
+                    Toast.makeText(this, R.string.bubble_open_failed, Toast.LENGTH_SHORT).show()
+                }
+            Toast.makeText(this, R.string.browser_guide_toast, Toast.LENGTH_LONG).show()
+            hideBubble()
+            return
+        }
         DownloadLog.update(media.url, DownloadLog.Phase.QUEUED, 0, "Queue में…")
         DownloadService.enqueue(this, media)
         Toast.makeText(this, getString(R.string.download_started), Toast.LENGTH_SHORT).show()

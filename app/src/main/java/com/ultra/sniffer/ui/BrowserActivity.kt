@@ -163,6 +163,11 @@ class BrowserActivity : AppCompatActivity() {
             load(binding.etUrl.text.toString())
             true
         }
+        binding.btnFind.setOnClickListener {
+            val url = binding.webView.url?.takeIf { it.startsWith("http") }
+                ?: binding.etUrl.text.toString()
+            ResolverFlow.resolveAndOffer(this, url)
+        }
         binding.chipDetected.setOnClickListener { showDetectedDialog() }
 
         binding.webView.webChromeClient = object : android.webkit.WebChromeClient() {

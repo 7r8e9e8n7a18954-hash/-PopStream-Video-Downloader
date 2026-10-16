@@ -39,20 +39,45 @@ class DownloadService : Service() {
         private const val EXTRA_KIND = "extra_kind"
         private const val EXTRA_LABEL = "extra_label"
         private const val EXTRA_SOURCE = "extra_source"
+        private const val EXTRA_AUDIO_URL = "extra_audio_url"
+        private const val EXTRA_HEADERS = "extra_headers"
         private val nextId = AtomicInteger(Notifications.ID_DOWNLOAD_BASE + 1)
 
-        fun enqueue(context: Context, media: SniffedMedia) {
+        /**
+         * @param audioUrl separate audio track to mux into the MP4 (optional)
+         * @param headers  extra HTTP headers (Referer / UA) needed by some CDNs
+         */
+        fun enqueue(
+            context: Context,
+            media: SniffedMedia,
+            audioUrl: String? = null,
+            headers: Map<String, String> = emptyMap()
+        ) {
             val intent = Intent(context, DownloadService::class.java).apply {
                 putExtra(EXTRA_URL, media.url)
                 putExtra(EXTRA_KIND, media.kind.name)
                 putExtra(EXTRA_LABEL, media.label)
                 putExtra(EXTRA_SOURCE, media.source.name)
+                if (audioUrl != null) putExtra(EXTRA_AUDIO_URL, audioUrl)
+                if (headers.isNotEmpty()) {
+                    putStringArrayListExtra(
+                        EXTRA_HEADERS,
+                        ArrayList(headers.map { "${it.key}\u0000${it.value}" })
+                    )
+                }
             }
             ContextCompat.startForegroundService(context, intent)
         }
     }
 
-    private val queue = ConcurrentLinkedQueue<SniffedMedia>()
+    /** One queued download. */
+    private data class Task(
+        val media: SniffedMedia,
+        val audioUrl: String?,
+        val headers: Map<String, String>
+    )
+
+    private val queue = ConcurrentLinkedQueue<Task>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var job: Job? = null
 
@@ -70,7 +95,12 @@ class DownloadService : Service() {
                 label = intent.getStringExtra(EXTRA_LABEL)
                     ?: MediaUrlUtils.guessDisplayName(url, MediaUrlUtils.hostOf(url))
             )
-            queue.add(media)
+            val headers = intent.getStringArrayListExtra(EXTRA_HEADERS)
+                ?.mapNotNull { entry ->
+                    val split = entry.indexOf('\u0000')
+                    if (split <= 0) null else entry.substring(0, split) to entry.substring(split + 1)
+                }?.toMap().orEmpty()
+            queue.add(Task(media, intent.getStringExtra(EXTRA_AUDIO_URL), headers))
             DownloadLog.update(url, DownloadLog.Phase.QUEUED, 0, "Queue में…")
         }
 
@@ -92,8 +122,8 @@ class DownloadService : Service() {
         job = scope.launch {
             var processed = 0
             while (true) {
-                val media = queue.poll() ?: break
-                runDownload(media)
+                val task = queue.poll() ?: break
+                runDownload(task)
                 processed++
             }
             if (processed == 0) delay(1200)
@@ -101,7 +131,8 @@ class DownloadService : Service() {
         }
     }
 
-    private suspend fun runDownload(media: SniffedMedia) {
+    private suspend fun runDownload(task: Task) {
+        val media = task.media
         val id = nextId.getAndIncrement()
         val label = media.label
         DownloadLog.update(media.url, DownloadLog.Phase.DOWNLOADING, 0, "शुरू…")
@@ -109,7 +140,7 @@ class DownloadService : Service() {
 
         try {
             val engine = DownloadEngine(this)
-            val file = engine.download(media) { percent, stage ->
+            val file = engine.download(media, task.audioUrl, task.headers) { percent, stage ->
                 val phase = if (stage.contains("merge", true) || stage.contains("MP4") || stage.contains("तैयार")) {
                     DownloadLog.Phase.MERGING
                 } else {

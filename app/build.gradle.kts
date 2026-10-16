@@ -11,8 +11,8 @@ android {
         applicationId = "com.ultra.sniffer"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
     }
 
     signingConfigs {
@@ -81,10 +81,16 @@ android {
             "META-INF/LICENSE*"
         )
         jniLibs {
+            // Phones only: keep x86 emulator libraries out of every APK.
+            excludes += setOf("lib/x86/**", "lib/x86_64/**")
             // ffmpeg-kit ships its native .so files already stripped.
             // Skipping AGP's symbol-strip step keeps the build working in
             // plain SDK-only environments (no NDK required) and on CI.
             keepDebugSymbols += "**/*.so"
+            // Compress the native libraries inside the APK. They are extracted
+            // once at install time; the download shrinks by ~45%, which matters
+            // a lot for the universal (all-ABI) APK.
+            useLegacyPackaging = true
         }
     }
 }

@@ -46,6 +46,17 @@
         android:visibility="gone"
         app:trackCornerRadius="2dp" />
 
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnFind"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="10dp"
+        android:text="@string/find_video_on_page"
+        android:textSize="13sp" />
+
     <TextView
         android:id="@+id/chipDetected"
         android:layout_width="match_parent"
