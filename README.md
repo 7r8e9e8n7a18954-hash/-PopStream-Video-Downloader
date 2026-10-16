@@ -1,5 +1,22 @@
 # Ultra Floating Video Sniffer
 
+## ⬇️ APK download (सीधे फ़ोन में install करने के लिए)
+
+हर commit पर GitHub Actions खुद APK बनाता है और यहाँ publish कर देता है:
+
+**➡️ https://github.com/7r8e9e8n7a18954-hash/-PopStream-Video-Downloader/releases/tag/latest**
+
+| फ़ाइल | Size | किसके लिए |
+|---|---|---|
+| `UltraSniffer-arm64-v8a.apk` | ≈29 MB | 2017 के बाद के लगभग सारे फ़ोन **(recommended)** |
+| `UltraSniffer-armeabi-v7a.apk` | ≈30 MB | पुराने 32-bit फ़ोन |
+| `UltraSniffer-universal.apk` | ≈109 MB | अगर ABI का पता न हो (दोनों एक में) |
+
+Install: APK खोलें → *Install unknown apps* allow करें → Install → app खोलें →
+**Start Sniffer & VPN** → VPN + overlay permission दें। बस।
+
+---
+
 एक पूरी तरह काम करने वाली **Android (Kotlin) app** जो:
 
 1. होम स्क्रीन के एक ही बटन **"Start Sniffer & VPN"** से `android.net.VpnService`
