@@ -111,9 +111,10 @@ non-root VPN app उसके अंदर का पूरा URL नहीं 
 3. Build पूरा होने पर:
    * **Releases → `latest`** में APK files मिलेंगी (सबसे आसान download link), और
    * **Actions → run → Artifacts** में `UltraSniffer-APK-*` zip भी मिलेगी।
-4. `UltraSniffer-arm64-v8a-release-*.apk` download करें (ज़्यादातर फ़ोनों के लिए
-   recommended)। अगर install न हो तो `UltraSniffer-universal-release-*.apk`
-   लें; debug variants भी वही मिलेंगे (backup के लिए)।
+4. `UltraSniffer-arm64-v8a-release-*.apk` (**≈29 MB**) download करें (ज़्यादातर फ़ोनों के लिए
+   recommended)। अगर install न हो तो `UltraSniffer-universal-release-*.apk` (≈109 MB)
+   लें; पुराने 32-bit फ़ोन के लिए `UltraSniffer-armeabi-v7a-release-*.apk` (≈30 MB) है।
+   Debug variants भी वही मिलेंगे (backup के लिए)।
 
 ### तरीका B — Android Studio
 
@@ -132,7 +133,13 @@ export JAVA_HOME=/path/to/jdk17
 ```
 
 ABI splits की वजह से हर variant में 3 APK बनती हैं:
-`…-arm64-v8a-…`, `…-armeabi-v7a-…`, `…-universal-…`।
+`…-arm64-v8a-…` (≈30 MB), `…-armeabi-v7a-…` (≈30 MB), `…-universal-…` (≈110 MB)।
+
+### तरीका D — Tests चलाना (parsers की जाँच)
+
+```bash
+./gradlew testDebugUnitTest     # HLS + DASH parser के 5 JVM tests
+```
 
 ---
 
@@ -224,6 +231,7 @@ chunks के बीच के timestamp jumps ठीक कर देता ह
 | UI | Material 3 (View system + ViewBinding), RecyclerView |
 | Networking | OkHttp 4.12 |
 | Media | ffmpeg-kit-full 6.0-2 (+ MediaMuxer fallback) |
+| Tests | JUnit4 — HLS/DASH parser tests (`./gradlew testDebugUnitTest`, CI में भी चलते हैं) |
 | Signing | demo keystore committed (`app/keystore/ultra-sniffer.keystore`) ताकि हर CI build installable + updatable हो |
 
 ---

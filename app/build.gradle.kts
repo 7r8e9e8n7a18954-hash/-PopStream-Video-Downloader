@@ -97,8 +97,10 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("xmlpull:xmlpull:1.1.3.1")
+    testImplementation("net.sf.kxml:kxml2:2.3.0")
 
     // ---------------------------------------------------------------------
     // Mobile-FFmpeg (ffmpeg-kit 6.0 LTS) — native ffmpeg used to

@@ -2,6 +2,7 @@ package com.ultra.sniffer.download
 
 import android.util.Xml
 import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserFactory
 import java.io.StringReader
 
 /** One DASH representation (video or audio track). */
@@ -22,9 +23,16 @@ data class DashRep(
  */
 object MpdParser {
 
-    fun parse(xml: String, pageUrl: String): List<DashRep> {
-        val parser = Xml.newPullParser()
-        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
+    /**
+     * @param parserProvider how the XML pull parser is created. Defaults to the
+     *        platform parser; unit tests can inject their own implementation.
+     */
+    fun parse(
+        xml: String,
+        pageUrl: String,
+        parserProvider: () -> XmlPullParser = ::platformParser
+    ): List<DashRep> {
+        val parser = parserProvider()
         parser.setInput(StringReader(xml))
 
         val reps = mutableListOf<DashRep>()
@@ -49,6 +57,12 @@ object MpdParser {
         var timelineTimes = mutableListOf<Long>()   // absolute start time (in timescale units)
         var timelineCount = 0
         var timelineCursor = 0L
+        // Timeline captured for the adaptation set (template scope) and for the
+        // current representation, so tracks never inherit each other's timeline.
+        var adTimelineTimes: MutableList<Long> = mutableListOf()
+        var adTimelineCount = 0
+        var templateTimelineTimes: MutableList<Long> = mutableListOf()
+        var templateTimelineCount = 0
 
         var event = parser.eventType
         while (event != XmlPullParser.END_DOCUMENT) {
@@ -78,6 +92,10 @@ object MpdParser {
                             adStartNumber = 1
                             adDuration = 0L
                             adTimescale = 1L
+                            adTimelineTimes = mutableListOf()
+                            adTimelineCount = 0
+                            timelineTimes = mutableListOf()
+                            timelineCount = 0
                             baseStack.add(pageUrl)
                         }
                         "Representation" -> {
@@ -92,6 +110,8 @@ object MpdParser {
                             templateStart = adStartNumber
                             templateDuration = adDuration
                             templateTimescale = adTimescale
+                            templateTimelineTimes = adTimelineTimes
+                            templateTimelineCount = adTimelineCount
                             baseStack.add(baseStack.lastOrNull() ?: pageUrl)
                         }
                         "SegmentTemplate" -> {
@@ -152,8 +172,8 @@ object MpdParser {
                         rep?.let { r ->
                             val urls = buildSegmentUrls(
                                 r, templateMedia, templateInit, templateStart,
-                                templateDuration, templateTimescale, timelineCount,
-                                timelineTimes.map { it }, mpdDurationSec
+                                templateDuration, templateTimescale, templateTimelineCount,
+                                templateTimelineTimes, mpdDurationSec
                             )
                             reps.add(
                                 DashRep(
@@ -169,13 +189,34 @@ object MpdParser {
                         rep = null
                         if (baseStack.isNotEmpty()) baseStack.removeAt(baseStack.size - 1)
                     }
-                    "SegmentTimeline" -> inTimeline = false
+                    "SegmentTimeline" -> {
+                        inTimeline = false
+                        val captured = timelineTimes
+                        if (rep != null) {
+                            templateTimelineTimes = captured
+                            templateTimelineCount = timelineCount
+                        } else {
+                            adTimelineTimes = captured
+                            adTimelineCount = timelineCount
+                        }
+                    }
                 }
             }
             event = parser.next()
         }
         return reps
     }
+
+    /**
+     * Platform pull parser: the standard factory first (works on Android and
+     * on the JVM when a factory is on the classpath), android.util.Xml second.
+     */
+    private fun platformParser(): XmlPullParser =
+        runCatching {
+            XmlPullParserFactory.newInstance().apply { isNamespaceAware = false }.newPullParser()
+        }.getOrElse {
+            Xml.newPullParser().apply { setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false) }
+        }
 
     // ------------------------------------------------------------------
 
@@ -197,12 +238,8 @@ object MpdParser {
         mpdDurationSec: Double
     ): Pair<List<String>, String?> {
         // SegmentList style
-        if (rep.segmentList.isNotEmpty()) {
-            val initUrl = init?.let { M3u8Parser.resolve(rep.base, it) }
-            return rep.segmentList to initUrl
-        }
-        val mediaPattern = media ?: return emptyList<String>() to null
-        val initUrl = init?.let { M3u8Parser.resolve(rep.base, it) }
+        val mediaPattern = media
+        if (mediaPattern == null && rep.segmentList.isEmpty()) return emptyList<String>() to null
 
         fun substitute(pattern: String, number: Int, time: Long): String {
             var p = pattern
@@ -213,6 +250,12 @@ object MpdParser {
             p = p.replace("\$Timescale\$", timescale.toString())
             return M3u8Parser.resolve(rep.base, p)
         }
+
+        // The initialization pattern may contain $RepresentationID$ / $Bandwidth$ too
+        val initUrl = init?.let { substitute(it, startNumber, 0L) }
+
+        if (rep.segmentList.isNotEmpty()) return rep.segmentList to initUrl
+        if (mediaPattern == null) return emptyList<String>() to initUrl
 
         val usesTime = mediaPattern.contains("\$Time\$")
         val urls = mutableListOf<String>()
