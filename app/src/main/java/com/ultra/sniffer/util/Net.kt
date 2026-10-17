@@ -1,6 +1,7 @@
 package com.ultra.sniffer.util
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -130,24 +131,70 @@ object Net {
 
     /**
      * Streams [url] into [outFile].
+     *
+     *  - **Resumes** partially downloaded files with an HTTP `Range` request
+     *    (a 200 reply means the server ignored the range → file restarts).
+     *  - **Retries** transient network errors ([attempts] tries, 1s/2s backoff).
+     *    Permanent HTTP errors (403/404/…) are not retried.
+     *
      * @return the response Content-Type (may be null), useful to detect playlists.
      */
     suspend fun download(
         url: String,
         outFile: File,
         headers: Map<String, String> = emptyMap(),
+        attempts: Int = 3,
+        resume: Boolean = true,
         onProgress: (downloaded: Long, total: Long) -> Unit = { _, _ -> }
+    ): String? {
+        var last: Throwable? = null
+        var currentAttempt = 0
+        while (currentAttempt < attempts.coerceAtLeast(1)) {
+            currentAttempt++
+            try {
+                return downloadOnce(url, outFile, headers, resume, onProgress)
+            } catch (t: Throwable) {
+                last = t
+                if (!isRetryable(t) || currentAttempt >= attempts) throw t
+                delay(1000L * currentAttempt)
+            }
+        }
+        throw last ?: IOException("Download failed")
+    }
+
+    private suspend fun downloadOnce(
+        url: String,
+        outFile: File,
+        headers: Map<String, String>,
+        resume: Boolean,
+        onProgress: (downloaded: Long, total: Long) -> Unit
     ): String? = withContext(Dispatchers.IO) {
-        client.newCall(request(url, headers)).execute().use { resp ->
-            if (!resp.isSuccessful) throw IOException("HTTP ${resp.code} for ${url.take(140)}")
+        val existing = if (resume && outFile.exists()) outFile.length() else 0L
+        val builder = request(url, headers).newBuilder()
+        if (existing > 0) builder.header("Range", "bytes=$existing-")
+
+        client.newCall(builder.build()).execute().use { resp ->
+            if (!resp.isSuccessful) throw HttpException(resp.code, url)
             val body = resp.body ?: throw IOException("Empty response body")
             val contentType = resp.header("Content-Type")
-            val total = body.contentLength()
-            var done = 0L
+            val append = resp.code == 206 && existing > 0
+            if (!append && existing > 0) outFile.delete()
+
+            // Total size: Content-Range ("bytes 100-999/1000") or Content-Length
+            val rangeTotal = resp.header("Content-Range")?.substringAfter('/', "")?.trim()?.toLongOrNull() ?: -1L
+            val length = body.contentLength()
+            val total = when {
+                rangeTotal > 0 -> rangeTotal
+                length > 0 -> length + (if (append) existing else 0L)
+                else -> -1L
+            }
+
+            var done = if (append) existing else 0L
+            onProgress(done, total)
             val buf = ByteArray(64 * 1024)
             outFile.parentFile?.mkdirs()
             body.byteStream().use { input ->
-                outFile.outputStream().use { output ->
+                java.io.FileOutputStream(outFile, append).use { output ->
                     while (true) {
                         val n = input.read(buf)
                         if (n <= 0) break
@@ -160,4 +207,22 @@ object Net {
             contentType
         }
     }
+
+    /** Permanent HTTP failures must not be retried. */
+    private fun isRetryable(t: Throwable): Boolean {
+        var cause: Throwable? = t
+        var depth = 0
+        while (cause != null && depth < 6) {
+            if (cause is HttpException) {
+                val code = cause.code
+                return code == 408 || code == 429 || code in 500..599
+            }
+            cause = cause.cause
+            depth++
+        }
+        return t is IOException
+    }
+
+    /** HTTP status error, kept as a type so the UI can show a useful reason. */
+    class HttpException(val code: Int, url: String) : IOException("HTTP $code for ${url.take(140)}")
 }

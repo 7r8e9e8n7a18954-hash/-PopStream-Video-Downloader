@@ -156,11 +156,29 @@ object MediaResolver {
             )
         }
 
+        // Honest, upfront answer for DRM platforms instead of a confusing failure:
+        // their paid content is legally and technically not downloadable here.
+        val host = MediaUrlUtils.hostOf(pageUrl).lowercase()
+        if (DRM_PLATFORMS.any { host.contains(it) }) {
+            return ResolveResult.Failed(
+                "यह DRM-protected platform है ($host) — यहाँ का paid/premium content download नहीं हो सकता। " +
+                    "Non-DRM videos (news, open/free content, अपनी videos) पूरी तरह download होती हैं।",
+                pageUrl
+            )
+        }
+
         return ResolveResult.Failed(
             "इस page में कोई सीधा video link नहीं दिखा। Page को in-app browser में खोलें → video चलाएँ → वहाँ से link पकड़ेगा।",
             pageUrl
         )
     }
+
+    /** Streaming platforms whose catalog is Widevine/DRM protected. */
+    private val DRM_PLATFORMS = listOf(
+        "netflix", "primevideo", "amazonvideo", "hotstar", "sonyliv", "zee5",
+        "jiocinema", "voot", "disneyplus", "hulu", "hbomax", "max.com",
+        "spotify", "gaana", "wynk", "applemusic", "music.apple"
+    )
 }
 
 /** Page result -> download option. */

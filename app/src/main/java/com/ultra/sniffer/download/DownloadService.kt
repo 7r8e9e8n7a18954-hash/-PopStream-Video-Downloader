@@ -162,8 +162,9 @@ class DownloadService : Service() {
             DownloadLog.update(media.url, DownloadLog.Phase.DONE, 100, "सेव हो गया: $displayName", uri.toString())
             notifyDone(label, displayName, uri, mime)
         } catch (t: Throwable) {
-            DownloadLog.update(media.url, DownloadLog.Phase.ERROR, 0, t.message ?: "डाउनलोड फेल")
-            notify(id, label, -1, "❌ ${t.message ?: "डाउनलोड फेल हो गया"}", ongoing = false)
+            val reason = DownloadErrors.friendly(t)
+            DownloadLog.update(media.url, DownloadLog.Phase.ERROR, 0, reason)
+            notify(id, label, -1, "❌ $reason", ongoing = false)
         }
     }
 

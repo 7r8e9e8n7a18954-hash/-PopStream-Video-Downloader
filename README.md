@@ -272,6 +272,8 @@ chunks के बीच के timestamp jumps ठीक कर देता ह
 | कुछ detect नहीं हो रहा | वह traffic HTTPS/QUIC है → **In-app Browser** use करें या link **Share/Paste** करें; "QUIC block" भी ON करें |
 | Internet slow लगता है | Settings में QUIC block OFF करें (या sniffer बंद करें — बंद करते ही normal VPN-free internet) |
 | Download में 403/404 | URL expire हो गया (signed CDN links कुछ देर में बदल जाते हैं) — video दोबारा चलाएँ और नया URL पकड़ें; YouTube links को तुरंत download करें |
+| Download बीच में टूटा (network बंद) | App खुद **retry (3 बार)** और **resume (जहाँ से टूटा वहीं से)** करती है — same link दोबारा download करें, पहले वाला हिस्सा दोबारा नहीं आएगा |
+| Netflix/Prime/Hotstar/JioCinema download | ये **DRM-protected** हैं — इनका content किसी भी non-root app से download नहीं हो सकता (legal + technical दोनों वजह)। इन platforms का link paste करने पर app साफ़ message दिखाकर बता देती है। बाकी सारा non-DRM content सामान्य रूप से download होता है |
 | बड़ी video के बाद MP4 में आवाज़/तस्वीर mismatch | वह stream असामान्य है — FFmpeg fail होने पर app MediaMerger से remux करती है; दोबारा try करें या `.ts` file cache से save हो जाती है |
 | App install नहीं हो रही | पुरानी install uninstall करें (signature अलग), फिर install करें |
 
