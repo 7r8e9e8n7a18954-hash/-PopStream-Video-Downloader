@@ -26,8 +26,20 @@ object Net {
             .followRedirects(true)
             .followSslRedirects(true)
             .retryOnConnectionFailure(true)
+            // Fast parallel downloads: many CDNs allow dozens of connections.
+            // Tuned for 8-way segment fetching (see SEMAPHORE_PERMITS).
+            .dispatcher(
+                okhttp3.Dispatcher().apply {
+                    maxRequests = 96
+                    maxRequestsPerHost = 32
+                }
+            )
+            .connectionPool(okhttp3.ConnectionPool(32, 5, TimeUnit.MINUTES))
             .build()
     }
+
+    /** How many segments/chunks are downloaded in parallel. */
+    const val SEMAPHORE_PERMITS = 8
 
     private fun request(url: String): Request =
         Request.Builder().url(url).header("User-Agent", USER_AGENT).build()
@@ -84,10 +96,17 @@ object Net {
         }
 
     /** Fetches at most [maxBytes] of text (used for HTML pages). */
-    suspend fun getTextCapped(url: String, maxBytes: Int = 3 * 1024 * 1024): String =
+    suspend fun getTextCapped(
+        url: String,
+        maxBytes: Int = 3 * 1024 * 1024,
+        headers: Map<String, String> = emptyMap()
+    ): String =
         withContext(Dispatchers.IO) {
             client.newCall(
-                request(url, mapOf("Accept" to "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8"))
+                request(
+                    url,
+                    headers + mapOf("Accept" to "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8")
+                )
             ).execute().use { resp ->
                 if (!resp.isSuccessful) throw IOException("HTTP ${resp.code} for ${url.take(140)}")
                 val body = resp.body ?: throw IOException("Empty response body")

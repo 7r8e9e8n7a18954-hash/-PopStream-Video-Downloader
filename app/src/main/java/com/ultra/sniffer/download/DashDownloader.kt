@@ -51,16 +51,30 @@ class DashDownloader(private val workDir: File) {
                 }
             }
 
-            val videoTrack = downloadTrack(
-                video, File(workDir, "dash_video"), "video", 0, if (audio != null) 78 else 100, onProgress
-            )
-
             if (audio == null) {
+                val videoTrack = downloadTrack(video, File(workDir, "dash_video"), "video", 0, 100, onProgress)
                 onProgress(-1, "Video track को MP4 में remux किया जा रहा है…")
                 return@withContext Merger.remux(videoTrack, File(workDir, "final.mp4"), TrackMode.ALL)
             }
 
-            val audioTrack = downloadTrack(audio, File(workDir, "dash_audio"), "audio", 78, 96, onProgress)
+            // Video + audio representations in parallel (2x faster on DASH)
+            val videoPct = AtomicInteger(0)
+            val audioPct = AtomicInteger(0)
+            val (videoTrack, audioTrack) = coroutineScope {
+                val videoJob = async(Dispatchers.IO) {
+                    downloadTrack(video, File(workDir, "dash_video"), "video", 0, 100) { pct, message ->
+                        if (pct in 0..100) videoPct.set(pct)
+                        onProgress((videoPct.get() * 55 + audioPct.get() * 45) / 100, message)
+                    }
+                }
+                val audioJob = async(Dispatchers.IO) {
+                    downloadTrack(audio, File(workDir, "dash_audio"), "audio", 0, 100) { pct, message ->
+                        if (pct in 0..100) audioPct.set(pct)
+                        onProgress((videoPct.get() * 55 + audioPct.get() * 45) / 100, message)
+                    }
+                }
+                videoJob.await() to audioJob.await()
+            }
 
             onProgress(-1, "FFmpeg से Video + Audio merge हो रहे हैं…")
             // One pass, both tracks, stream copy — the sweet spot.
@@ -110,7 +124,7 @@ class DashDownloader(private val workDir: File) {
             return file
         }
 
-        val semaphore = Semaphore(4)
+        val semaphore = Semaphore(Net.SEMAPHORE_PERMITS)
         val done = AtomicInteger(0)
         val total = urls.size
         val files = coroutineScope {

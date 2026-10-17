@@ -70,15 +70,12 @@ jobs:
             | grep '\.apk$' \
             | while read -r name; do gh release delete-asset latest "$name" -y || true; done
 
-      - name: Upload APK artifacts
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: UltraSniffer-APK-${{ github.run_number }}
-          # Small per-ABI release APKs for power users; the single universal
-          # APK is published on the "latest" release page.
-          path: |
-            dist/UltraSniffer-arm64-v8a-release-*.apk
-            dist/UltraSniffer-armeabi-v7a-release-*.apk
+          # Exactly ONE file — the same universal APK as the release page.
+          path: dist/UltraSniffer.apk
           retention-days: 7
 
       - name: Publish/update "latest" GitHub release (easy APK download)
@@ -94,13 +91,18 @@ jobs:
             **`UltraSniffer.apk`** — इसे download करें, खोलें, Install करें।
             (इसमें सभी फ़ोन की libraries हैं — कोई confusion नहीं।)
 
-            ## ✨ इस build में नया क्या है
-            * **YouTube link paste करें → असली quality options में download**
-              (1080p तक, video+audio merge होकर एक MP4)।
-            * **किसी भी website का link paste करें** → app page के अंदर से
-              video (.mp4/.m3u8/.mpd) खुद ढूँढ लेता है।
-            * In-app browser में नया बटन **"🎬 इस page की video ढूँढो"**।
+            ## ✨ इस build (v1.2.0) में नया
+            * **Instagram + Facebook** links भी download होते हैं (public Reels/posts/videos,
+              fb.watch support) — YouTube की तरह link Share/Paste करें।
+            * **Downloads अब ~2x तेज़** — HLS/DASH chunks 8 parallel connections से,
+              video+audio tracks साथ-साथ download, टूटे download auto-resume (retry 3x)।
+            * **एक video = एक entry** — master playlist + variants + chunks अब list में
+              अलग-अलग नहीं दिखते (यही "3 results" वाली confusion थी)।
+            * YouTube home-page के preview clips की fake entries बंद — सिर्फ़ आपकी
+              चलाई हुई video ही पकड़ी जाती है।
             * कुछ भी block/बंद नहीं — कोई password, कोई admin panel, कोई kill-switch।
+              (DRM-protected paid content — Netflix/Prime/Hotstar आदि — नहीं होता, यह
+              Android की security है, हर app पर लागू।)
 
             ## ▶️ 3 step में चलाएँ
             1. App खोलें → **Start Sniffer & VPN** → Android की VPN +

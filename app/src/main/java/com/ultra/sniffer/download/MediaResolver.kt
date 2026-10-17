@@ -53,7 +53,7 @@ object MediaResolver {
             return ResolveResult.Failed("सही http(s) link डालें", url)
         }
 
-        // 1) YouTube — biggest request, handled by the dedicated extractor
+        // 1) YouTube — dedicated InnerTube extraction
         YouTubeExtractor.videoIdOf(url)?.let { videoId ->
             return try {
                 val ex = YouTubeExtractor.extract(videoId)
@@ -67,12 +67,22 @@ object MediaResolver {
             }
         }
 
-        // 2) obviously a media URL — download it directly
+        // 2) Instagram / Facebook — normal public (non-DRM) videos, Reels, fb.watch
+        if (SocialExtractor.isInstagram(url)) {
+            val streams = runCatching { SocialExtractor.instagram(url) }.getOrElse { emptyList() }
+            if (streams.isNotEmpty()) return ResolveResult.Options("Instagram video", streams)
+        }
+        if (SocialExtractor.isFacebook(url)) {
+            val streams = runCatching { SocialExtractor.facebook(url) }.getOrElse { emptyList() }
+            if (streams.isNotEmpty()) return ResolveResult.Options("Facebook video", streams)
+        }
+
+        // 3) obviously a media URL — download it directly
         if (MediaUrlUtils.kindOf(url) != MediaKind.UNKNOWN || MediaUrlUtils.isLikelyMedia(url)) {
             return ResolveResult.Direct(SniffedMedia.fromUrl(url, MediaSource.MANUAL))
         }
 
-        // 3) ask the server what this URL really is
+        // 4) ask the server what this URL really is
         val probe = runCatching { Net.probe(url) }.getOrNull()
         probe?.let { p ->
             MediaUrlUtils.kindFromContentType(p.contentType)?.let { kind ->
@@ -84,7 +94,7 @@ object MediaResolver {
             }
         }
 
-        // 4) treat it as a web page and look inside
+        // 5) treat it as a web page and look inside
         return resolvePage(url, probe?.finalUrl ?: url)
     }
 
@@ -135,7 +145,7 @@ object MediaResolver {
             return ResolveResult.Options(title, found.map { it.toResolved() })
         }
 
-        // 5) page embeds a YouTube player? follow it
+        // 6) page embeds a YouTube player? follow it
         for (id in PageMediaExtractor.findYouTubeIds(html)) {
             val ex = runCatching { YouTubeExtractor.extract(id) }.getOrNull() ?: continue
             if (ex.ok) return ResolveResult.Options(ex.title.ifBlank { "YouTube video" }, ex.streams)

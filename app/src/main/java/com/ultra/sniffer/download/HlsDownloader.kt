@@ -69,15 +69,14 @@ class HlsDownloader(private val workDir: File) {
             if (media.segmentUrls.isEmpty()) throw IOException("HLS playlist में कोई segment नहीं मिला")
 
             val hasSeparateAudio = audioPlaylistUrl != null
-            val cut = if (hasSeparateAudio) 80 else 100
 
-            // ---------------- video track ----------------
-            val videoTrack = downloadTrack(
-                media.segmentUrls, media.initUrl, media.durations,
-                File(workDir, "hls_video"), "video", 0, cut, onProgress
-            )
-            val videoPlaylist = writeLocalPlaylist(File(workDir, "video_track.m3u8"), videoTrack)
+            // ---------------- video track (no separate audio) ----------------
             if (!hasSeparateAudio) {
+                val videoTrack = downloadTrack(
+                    media.segmentUrls, media.initUrl, media.durations,
+                    File(workDir, "hls_video"), "video", 0, 100, onProgress
+                )
+                val videoPlaylist = writeLocalPlaylist(File(workDir, "video_track.m3u8"), videoTrack)
                 onProgress(-1, "FFmpeg से single MP4 बन रहा है…")
                 Merger.remuxPlaylist(videoPlaylist, File(workDir, "final.mp4"))
                     ?.let { return@withContext it }
@@ -87,13 +86,32 @@ class HlsDownloader(private val workDir: File) {
                 return@withContext Merger.remux(merged, File(workDir, "final.mp4"), TrackMode.ALL)
             }
 
-            // ---------------- audio track (separate rendition) ----------------
-            val audioPlaylistUrl2 = audioPlaylistUrl!!
-            val audioMedia = M3u8Parser.parseMedia(Net.getText(audioPlaylistUrl2), audioPlaylistUrl2)
-            val audioTrack = downloadTrack(
-                audioMedia.segmentUrls, audioMedia.initUrl, audioMedia.durations,
-                File(workDir, "hls_audio"), "audio", 80, 97, onProgress
-            )
+            // ---------------- video + audio tracks, downloaded in parallel ----------------
+            val audioMedia = M3u8Parser.parseMedia(Net.getText(audioPlaylistUrl!!), audioPlaylistUrl)
+            val videoPct = AtomicInteger(0)
+            val audioPct = AtomicInteger(0)
+            val (videoTrack, audioTrack) = coroutineScope {
+                val videoJob = async(Dispatchers.IO) {
+                    downloadTrack(
+                        media.segmentUrls, media.initUrl, media.durations,
+                        File(workDir, "hls_video"), "video", 0, 100
+                    ) { pct, message ->
+                        if (pct in 0..100) videoPct.set(pct)
+                        onProgress((videoPct.get() * 55 + audioPct.get() * 45) / 100, message)
+                    }
+                }
+                val audioJob = async(Dispatchers.IO) {
+                    downloadTrack(
+                        audioMedia.segmentUrls, audioMedia.initUrl, audioMedia.durations,
+                        File(workDir, "hls_audio"), "audio", 0, 100
+                    ) { pct, message ->
+                        if (pct in 0..100) audioPct.set(pct)
+                        onProgress((videoPct.get() * 55 + audioPct.get() * 45) / 100, message)
+                    }
+                }
+                videoJob.await() to audioJob.await()
+            }
+            val videoPlaylist = writeLocalPlaylist(File(workDir, "video_track.m3u8"), videoTrack)
             val audioPlaylist = writeLocalPlaylist(File(workDir, "audio_track.m3u8"), audioTrack)
 
             onProgress(-1, "Video + Audio merge हो रहे हैं…")
@@ -156,7 +174,7 @@ class HlsDownloader(private val workDir: File) {
         defaultExt: String,
         onProgress: (Int, String) -> Unit
     ): List<File> = coroutineScope {
-        val semaphore = Semaphore(4)
+        val semaphore = Semaphore(Net.SEMAPHORE_PERMITS)
         val total = urls.size
         val done = AtomicInteger(0)
         urls.mapIndexed { index, u ->

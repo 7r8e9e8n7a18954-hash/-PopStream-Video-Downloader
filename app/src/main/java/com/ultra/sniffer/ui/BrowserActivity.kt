@@ -58,9 +58,19 @@ class BrowserActivity : AppCompatActivity() {
               try {
                 if (window.__ultraHooked) return;
                 window.__ultraHooked = true;
+                window.__ultraPlayed = false;
+                function markPlayed(){ window.__ultraPlayed = true; }
+                document.addEventListener('play', markPlayed, true);
+                document.addEventListener('playing', markPlayed, true);
                 function report(u){
-                  try { u = String(u || ''); if (u.length < 12) return;
-                        UltraBridge.onMediaUrl(u, document.title || ''); } catch(e){}
+                  try {
+                    u = String(u || ''); if (u.length < 12) return;
+                    // YouTube home/feed preloads preview clips of OTHER videos via
+                    // 'videoplayback' fetches. Only trust them once the user's own
+                    // video is actually playing, so one video = one entry.
+                    if (/videoplayback|mime=video|mime=audio/i.test(u) && !window.__ultraPlayed) return;
+                    UltraBridge.onMediaUrl(u, document.title || '');
+                  } catch(e){}
                 }
                 var re = /\.(m3u8|mpd|mp4|m4v|m4s|ts|webm|mkv|mov|flv|m4a|mp3|aac)(\?|#|${'$'})/i;
                 window.__ultraLooks = function(u){
@@ -142,7 +152,13 @@ class BrowserActivity : AppCompatActivity() {
                 view: WebView?,
                 request: WebResourceRequest?
             ): WebResourceResponse? {
-                request?.url?.toString()?.let { report(it, binding.webView.title) }
+                val url = request?.url?.toString()
+                // 'videoplayback' fetches are YouTube's feed preview clips of OTHER
+                // videos — skip them here; the JS hooks report the real playback
+                // (SABR/XHR) once the user's video actually plays.
+                if (url != null && !url.contains("videoplayback", true)) {
+                    report(url, binding.webView.title)
+                }
                 return null // never block the page
             }
 

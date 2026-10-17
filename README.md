@@ -28,9 +28,13 @@ Install: APK खोलें → *Install unknown apps* allow करें → I
 3. **In-app Browser** देती है जो HTTPS (YouTube, Facebook, Instagram, किसी भी site)
    के अंदर तक देख सकती है — WebView के `shouldInterceptRequest` + JS hooks
    (XHR / fetch / `<video>` / Resource-Timing) से **एन्क्रिप्टेड video URLs भी** पकड़ती है।
-4. **YouTube link paste/share करें → असली quality options** (1080p तक) निकलती हैं —
-   app YouTube के InnerTube API से video + audio tracks लाता है और FFmpeg से
-   merge करके एक high-quality MP4 बनाता है।
+4. **YouTube / Instagram / Facebook link paste/share करें → असली quality options**
+   (1080p तक) निकलती हैं — app खुद video + audio tracks लाता है और FFmpeg से
+   merge करके एक high-quality MP4 बनाता है। (ये सब normal/public videos हैं —
+   किसी भी DRM-protected content को app touch नहीं करती।)
+5. **Downloads तेज़** — HLS/DASH के chunks **8 parallel connections** से आते हैं,
+   video + audio tracks **साथ-साथ** download होते हैं, पुरानी 4-way limit से
+   लगभग 2x speed।
 5. **किसी भी website का link paste करें** → app page के HTML के अंदर से
    video (`.mp4`/`.m3u8`/`.mpd`, `og:video`, embedded JSON) खुद ढूँढ लेता है;
    page के अंदर embedded YouTube player हो तो उसे भी resolve करता है।
@@ -136,7 +140,8 @@ download pipeline में जाते हैं:
 |---|---|---|
 | **VPN Sniffer** | वो सारा traffic जो plain HTTP है: बहुत सारी वेबसाइट, CDN, `.m3u8`/`.mpd`/`.ts`/`.mp4` plain links; HTTPS से host hint (+bubble जो browser खोलता है) | किसी भी app/browser में चलने वाला open video traffic |
 | **In-app Browser** | HTTPS भी — page जो भी media request करता है (m3u8/mp4/DASH) + **"🎬 इस page की video ढूँढो"** बटन | YouTube/FB/Instagram जैसी encrypted sites |
-| **YouTube link** | YouTube का असली player API — 1080p तक video+audio tracks, FFmpeg merge | YouTube का कोई भी link (Share/Paste) |
+| **YouTube link** | YouTube का असली player API — 1080p तक video+audio tracks, FFmpeg merge | YouTube का कोई भी normal link (Share/Paste) |
+| **Instagram / Facebook link** | Public post/reel/video का asli MP4 (HD preference), fb.watch support | Instagram Reels/posts, Facebook videos (login-wall वाले posts in-app browser से) |
 | **किसी भी site का link** | Page के HTML/JSON से `.mp4`/`.m3u8`/`.mpd`, `og:video`, embedded players | कोई भी web page link |
 
 > **छिपाई हुई सच्चाई:** non-root Android पर HTTPS payload किसी भी app के लिए
@@ -157,7 +162,7 @@ download pipeline में जाते हैं:
 2. **Run workflow** दबाएँ (या कोई भी commit push करें)।
 3. Build पूरा होने पर:
    * **Releases → `latest`** में APK files मिलेंगी (सबसे आसान download link), और
-   * **Actions → run → Artifacts** में `UltraSniffer-APK-*` zip भी मिलेगी।
+   * **Actions → run → Artifacts** में भी वही एक `UltraSniffer.apk` मिलेगी।
 4. **`UltraSniffer.apk`** (~30 MB) download करें — यही एक file है, हर फ़ोन
    (arm64 + armeabi-v7a दोनों) में install हो जाती है। नाम हर build में same
    रहता है — link हमेशा latest APK देगा।
@@ -267,6 +272,8 @@ chunks के बीच के timestamp jumps ठीक कर देता ह
 |---|---|
 | Floating bubble नहीं दिख रहा | Settings → Apps → Ultra Sniffer → **Display over other apps** ON करें, फिर sniffer restart करें |
 | YouTube download नहीं हुआ | YouTube का link app में **Share/Paste** करें — app खुद 1080p तक की qualities दिखाता है। (Sniffer सिर्फ HTTPS host hint देख सकता है, इसलिए normal YouTube app से direct पकड़ नहीं पाता — यह Android की limitation है, link वाला तरीका इसे पूरा हल करता है।) |
+| Instagram/Facebook video नहीं मिली | Public post/reel का link paste करें। Private/login-wall वाले posts का कोई भी app बिना login नहीं ला सकता — ऐसे link पर app in-app browser का रास्ता दिखा देती है। |
+| एक video चलाया पर list में कई entries | Playlist (master + variants) और chunk files अब अलग entries नहीं बनते — एक video = एक entry. पुरानी entries "साफ़ करें" से हट जाती हैं। |
 | "YouTube ने sign-in/bot-check लगाया" message | उस video को in-app browser में चलाएँ → **🎬 इस page की video ढूँढो** दबाएँ |
 | Page से कोई video नहीं मिली | **"फिर भी download करो"** दबाएँ, या उसी page को in-app browser में खोलकर video चलाएँ (WebView अंदर से links पकड़ता है) |
 | कुछ detect नहीं हो रहा | वह traffic HTTPS/QUIC है → **In-app Browser** use करें या link **Share/Paste** करें; "QUIC block" भी ON करें |
@@ -289,7 +296,7 @@ chunks के बीच के timestamp jumps ठीक कर देता ह
 | UI | Material 3 (View system + ViewBinding), RecyclerView |
 | Networking | OkHttp 4.12 |
 | Media | ffmpeg-kit-full 6.0-2 (+ MediaMuxer fallback) |
-| Tests | JUnit4 — 15 JVM tests: HLS/DASH parsers, page media extractor, YouTube pairing (`./gradlew testDebugUnitTest`, CI में भी चलते हैं) |
+| Tests | JUnit4 — 26 JVM tests: HLS/DASH parsers, page extractor, YouTube pairing, social extractor, error mapping (`./gradlew testDebugUnitTest`, CI में भी चलते हैं) |
 | Signing | demo keystore committed (`app/keystore/ultra-sniffer.keystore`) ताकि हर CI build installable + updatable हो |
 
 ---

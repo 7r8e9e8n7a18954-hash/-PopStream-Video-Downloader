@@ -6,8 +6,11 @@ import com.ultra.sniffer.core.SniffedMedia
 import com.ultra.sniffer.util.MediaUrlUtils
 import com.ultra.sniffer.util.Net
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Dispatches a detected media URL to the right downloader and returns the
@@ -58,16 +61,35 @@ class DownloadEngine(private val context: Context) {
         val videoFile = File(workDir, "video_track.mp4")
         val audioFile = File(workDir, "audio_track.m4a")
 
-        onProgress(0, "Video track डाउनलोड…")
-        Net.download(media.url, videoFile, headers) { done, total ->
-            val percent = if (total > 0) (done * 55 / total).toInt() else -1
-            onProgress(percent, "Video: ${mb(done)}${if (total > 0) " / ${mb(total)}" else ""}")
+        // Both tracks at the same time — roughly halves the download time.
+        val videoPct = AtomicInteger(0)
+        val audioPct = AtomicInteger(0)
+
+        fun report(stage: String, done: Long, total: Long, isVideo: Boolean) {
+            val pct = if (total > 0) ((done * 100) / total).toInt() else -1
+            if (pct >= 0) {
+                if (isVideo) videoPct.set(pct) else audioPct.set(pct)
+            }
+            val combined = (videoPct.get() * 65 + audioPct.get() * 35) / 100
+            onProgress(
+                if (pct < 0) -1 else combined,
+                "$stage: ${mb(done)}${if (total > 0) " / ${mb(total)}" else ""}"
+            )
         }
 
-        onProgress(55, "Audio track डाउनलोड…")
-        Net.download(audioUrl, audioFile, headers) { done, total ->
-            val percent = if (total > 0) 55 + (done * 33 / total).toInt() else -1
-            onProgress(percent, "Audio: ${mb(done)}${if (total > 0) " / ${mb(total)}" else ""}")
+        coroutineScope {
+            val videoJob = async(Dispatchers.IO) {
+                Net.download(media.url, videoFile, headers) { done, total ->
+                    report("Video", done, total, isVideo = true)
+                }
+            }
+            val audioJob = async(Dispatchers.IO) {
+                Net.download(audioUrl, audioFile, headers) { done, total ->
+                    report("Audio", done, total, isVideo = false)
+                }
+            }
+            videoJob.await()
+            audioJob.await()
         }
 
         onProgress(90, "Video + Audio merge हो रहा है…")

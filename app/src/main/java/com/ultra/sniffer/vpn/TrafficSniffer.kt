@@ -3,6 +3,7 @@ package com.ultra.sniffer.vpn
 import com.ultra.sniffer.core.MediaKind
 import com.ultra.sniffer.core.MediaSource
 import com.ultra.sniffer.core.SniffedMedia
+import com.ultra.sniffer.download.PageMediaExtractor
 import com.ultra.sniffer.util.MediaUrlUtils
 import java.nio.charset.StandardCharsets
 
@@ -61,9 +62,50 @@ class TrafficSniffer(
         var parsed = false
     }
 
+    /** URLs that a playlist/manifest referenced: they are children, not videos. */
+    private val playlistChildren = HashSet<String>()
+
     private val httpFlows = HashMap<FlowKey, HttpFlow>()
     private val httpRequests = HashMap<FlowKey, HttpFlow>()
     private val tlsFlows = HashMap<FlowKey, TlsFlow>()
+
+    /** Chunk files are internal parts of a stream — never useful as list entries. */
+    private fun isChunkUrl(url: String): Boolean =
+        MediaUrlUtils.extOf(url) in setOf("ts", "m4s", "m2ts", "aac")
+
+    private fun isPlaylistChild(url: String): Boolean = playlistChildren.contains(url)
+
+    /**
+     * Reads a downloaded playlist/manifest body and remembers every URL it
+     * references, so ONE video shows as ONE list entry (the master manifest)
+     * instead of master + variants + audio + chunk noise.
+     */
+    private fun rememberPlaylistChildren(baseUrl: String, body: String, contentType: String) {
+        val children = ArrayList<String>(32)
+        if (contentType.contains("mpegurl", true)) {
+            for (line in body.lineSequence()) {
+                val t = line.trim()
+                if (t.isEmpty()) continue
+                if (t.startsWith("#")) {
+                    if (t.startsWith("#EXT-X-MAP", true)) {
+                        t.substringAfter("URI=\"", "").substringBefore('"').takeIf { it.isNotBlank() }
+                            ?.let { children.add(PageMediaExtractor.absolutize(baseUrl, it)) }
+                    }
+                    continue
+                }
+                children.add(PageMediaExtractor.absolutize(baseUrl, t))
+            }
+        } else {
+            Regex("(?:media|initialization|sourceURL|href)\\s*=\\s*\"([^\"]+)\"", RegexOption.IGNORE_CASE)
+                .findAll(body).forEach { children.add(PageMediaExtractor.absolutize(baseUrl, it.groupValues[1])) }
+            Regex("<BaseURL[^>]*>([^<]+)</BaseURL>", RegexOption.IGNORE_CASE)
+                .findAll(body).forEach { children.add(PageMediaExtractor.absolutize(baseUrl, it.groupValues[1].trim())) }
+        }
+        synchronized(playlistChildren) {
+            if (playlistChildren.size > 8192) playlistChildren.clear()
+            playlistChildren.addAll(children)
+        }
+    }
 
     // ------------------------------------------------------------------
     // Entry points (called by the relay engines)
@@ -171,7 +213,7 @@ class TrafficSniffer(
         val url = "http://$fullHost${flow.path}"
         httpRequests[key] = flow
 
-        if (MediaUrlUtils.isLikelyMedia(url)) {
+        if (MediaUrlUtils.isLikelyMedia(url) && !isChunkUrl(url) && !isPlaylistChild(url)) {
             emit(SniffedMedia.fromUrl(url, MediaSource.HTTP))
         }
     }
@@ -204,7 +246,16 @@ class TrafficSniffer(
         val url = "http://$host$path"
 
         val kind: MediaKind? = MediaUrlUtils.kindFromContentType(contentType)
-        if (kind != null) {
+
+        // Learn the children of every playlist/manifest we see.
+        if (kind == MediaKind.HLS || kind == MediaKind.DASH) {
+            val bodyStart = headerEnd + 4
+            if (bodyStart < text.length) {
+                rememberPlaylistChildren(url, text.substring(bodyStart), contentType.orEmpty())
+            }
+        }
+
+        if (kind != null && !isChunkUrl(url) && !isPlaylistChild(url)) {
             emit(
                 SniffedMedia(
                     url = url,
